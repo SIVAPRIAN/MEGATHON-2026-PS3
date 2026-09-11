@@ -8,6 +8,62 @@ export interface CameraLayerOptions {
   onSelectCamera?: (camera: EOCamera | null) => void;
 }
 
+export function createCameraImageData(
+  bodyColor: string,
+  strokeColor: string,
+  lensColor: string
+): ImageData {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(2, 2);
+
+  // Sensor base mount
+  ctx.fillStyle = '#334155';
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 0.5;
+  ctx.fillRect(5.5, 10.5, 3, 2);
+  ctx.strokeRect(5.5, 10.5, 3, 2);
+
+  // Sensor pivot yoke
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(4, 9);
+  ctx.lineTo(4, 10.5);
+  ctx.lineTo(10, 10.5);
+  ctx.lineTo(10, 9);
+  ctx.stroke();
+
+  // Sensor camera barrel housing
+  ctx.fillStyle = bodyColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(3, 4.5, 8, 4.8, 1.2);
+  } else {
+    ctx.rect(3, 4.5, 8, 4.8);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Optical aperture lens
+  ctx.beginPath();
+  ctx.arc(7, 6.9, 1.6, 0, Math.PI * 2);
+  ctx.fillStyle = lensColor;
+  ctx.fill();
+
+  // Optical reflection dot
+  ctx.beginPath();
+  ctx.arc(6.5, 6.4, 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  return ctx.getImageData(0, 0, 32, 32);
+}
+
 /**
  * Creates a professional 14x14px SVG fixed optical sensor silhouette image
  */
@@ -16,34 +72,16 @@ export function createCameraSvgImage(
   strokeColor: string,
   lensColor: string
 ): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const svgString = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <!-- Sensor base mount -->
-        <rect x="5.5" y="10.5" width="3" height="2" rx="0.5" fill="#334155" stroke="#475569" stroke-width="0.5" />
-        <!-- Sensor pivot yoke -->
-        <path d="M4 9 L4 10.5 L10 10.5 L10 9" stroke="#64748b" stroke-width="0.8" fill="none" />
-        <!-- Sensor camera barrel housing -->
-        <rect x="3" y="4.5" width="8" height="4.8" rx="1.2" fill="${bodyColor}" stroke="${strokeColor}" stroke-width="0.9" />
-        <!-- Optical aperture lens -->
-        <circle cx="7" cy="6.9" r="1.6" fill="${lensColor}" />
-        <!-- Optical reflection dot -->
-        <circle cx="6.5" cy="6.4" r="0.5" fill="#ffffff" opacity="0.8" />
-      </svg>
-    `;
-
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d')!;
+    const imgData = createCameraImageData(bodyColor, strokeColor, lensColor);
+    ctx.putImageData(imgData, -8, -8);
     const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = (err) => {
-      URL.revokeObjectURL(url);
-      reject(err);
-    };
-    img.src = url;
+    img.src = canvas.toDataURL();
+    img.onload = () => resolve(img);
   });
 }
 
@@ -147,25 +185,18 @@ export class CameraLayerController {
   public async init(): Promise<void> {
     if (this.isInitialized || !this.map) return;
 
-    // 1. Register Professional SVG Sensor Markers (Normal, Active Demo, Selected)
+    // 1. Register Professional Sensor Markers (Normal, Active Demo, Selected) synchronously
     try {
-      // Normal / Reference: Dark navy body, subtle blue-gray border, slate lens
-      const normalImg = await createCameraSvgImage('#1e293b', '#64748b', '#94a3b8');
-      // Active Demo (e.g. PSS Madras): Slate body, blue border, sky blue lens
-      const activeImg = await createCameraSvgImage('#0f172a', '#0284c7', '#38bdf8');
-      // Selected highlight: Dark body, bright cyan highlight, high-contrast lens
-      const selectedImg = await createCameraSvgImage('#0f172a', '#38bdf8', '#7dd3fc');
-
       if (this.map.hasImage('camera-marker-normal')) this.map.removeImage('camera-marker-normal');
-      this.map.addImage('camera-marker-normal', normalImg);
+      this.map.addImage('camera-marker-normal', createCameraImageData('#1e293b', '#64748b', '#94a3b8'), { pixelRatio: 2 });
 
       if (this.map.hasImage('camera-marker-active')) this.map.removeImage('camera-marker-active');
-      this.map.addImage('camera-marker-active', activeImg);
+      this.map.addImage('camera-marker-active', createCameraImageData('#0f172a', '#0284c7', '#38bdf8'), { pixelRatio: 2 });
 
       if (this.map.hasImage('camera-marker-selected')) this.map.removeImage('camera-marker-selected');
-      this.map.addImage('camera-marker-selected', selectedImg);
+      this.map.addImage('camera-marker-selected', createCameraImageData('#0f172a', '#38bdf8', '#7dd3fc'), { pixelRatio: 2 });
     } catch (e) {
-      console.error('Failed to register camera SVG images', e);
+      console.error('Failed to register camera images', e);
     }
 
     // 2. Build GeoJSON FeatureCollection for all 87 DGLL NAIS Physical Shore Stations
@@ -335,6 +366,7 @@ export class CameraLayerController {
           'icon-anchor': 'center',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
+          'icon-optional': true,
           // Labels shown only at close zoom to avoid crowding
           'text-field': ['get', 'siteName'],
           'text-size': 8.5,

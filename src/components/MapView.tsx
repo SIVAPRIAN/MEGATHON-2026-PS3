@@ -147,63 +147,85 @@ export const MapView: React.FC<MapViewProps> = ({
 
     map.on('load', async () => {
       // 1. Initialize Maritime Boundaries (Global EEZ WMS, India EEZ Vector, 12 NM Territorial Sea)
-      const boundaryController = new MaritimeBoundaryLayerController({ map });
-      boundaryController.init();
-      boundaryControllerRef.current = boundaryController;
+      try {
+        const boundaryController = new MaritimeBoundaryLayerController({ map });
+        boundaryController.init();
+        boundaryControllerRef.current = boundaryController;
+      } catch (err) {
+        console.error('Error initializing maritime boundaries:', err);
+      }
 
       // 2. Initialize Coastal EO Cameras & FOVs (only selected camera shows FOV)
-      const cameraController = new CameraLayerController({
-        map,
-        cameras: MOCK_CAMERAS,
-        onSelectCamera: (cam) => {
-          if (onSelectCameraRef.current) onSelectCameraRef.current(cam);
-        },
-      });
-      await cameraController.init();
-      cameraController.setSelectedCamera(selectedCamera);
-      cameraControllerRef.current = cameraController;
+      try {
+        const cameraController = new CameraLayerController({
+          map,
+          cameras: MOCK_CAMERAS,
+          onSelectCamera: (cam) => {
+            if (onSelectCameraRef.current) onSelectCameraRef.current(cam);
+          },
+        });
+        await cameraController.init();
+        cameraController.setSelectedCamera(selectedCamera);
+        cameraControllerRef.current = cameraController;
+      } catch (err) {
+        console.error('Error initializing camera layer:', err);
+      }
 
       // 3. Initialize Map-Native Vessel Tracking Layer (8–18px symbols, clusters, tracks)
-      const vesselController = new VesselLayerController({
-        map,
-        vessels,
-        onSelectVessel: (vsl) => {
-          if (onSelectVesselRef.current) onSelectVesselRef.current(vsl);
-        },
-      });
-      await vesselController.init();
-      vesselController.setSelectedVessel(selectedVesselId);
-      vesselControllerRef.current = vesselController;
+      try {
+        const vesselController = new VesselLayerController({
+          map,
+          vessels,
+          onSelectVessel: (vsl) => {
+            if (onSelectVesselRef.current) onSelectVesselRef.current(vsl);
+          },
+        });
+        await vesselController.init();
+        vesselController.setSelectedVessel(selectedVesselId);
+        vesselControllerRef.current = vesselController;
+      } catch (err) {
+        console.error('Error initializing vessel layer:', err);
+      }
 
       // 4. Initialize Restricted Areas Layer (GeoJSON polygon, free-draw tool)
-      const restrictedController = new RestrictedAreaLayerController({
-        map,
-        restrictedAreas,
-        onSelectArea: (area) => {
-          if (onSelectRestrictedAreaRef.current) onSelectRestrictedAreaRef.current(area);
-        },
-        onDrawingComplete: (coords) => {
-          if (onDrawingCompleteRef.current) onDrawingCompleteRef.current(coords);
-        },
-        onDrawingCancel: () => {
-          if (onDrawingCancelRef.current) onDrawingCancelRef.current();
-        },
-      });
-      restrictedController.init();
-      restrictedControllerRef.current = restrictedController;
+      try {
+        const restrictedController = new RestrictedAreaLayerController({
+          map,
+          restrictedAreas,
+          onSelectArea: (area) => {
+            if (onSelectRestrictedAreaRef.current) onSelectRestrictedAreaRef.current(area);
+          },
+          onDrawingComplete: (coords) => {
+            if (onDrawingCompleteRef.current) onDrawingCompleteRef.current(coords);
+          },
+          onDrawingCancel: () => {
+            if (onDrawingCancelRef.current) onDrawingCancelRef.current();
+          },
+        });
+        restrictedController.init();
+        restrictedControllerRef.current = restrictedController;
 
-      if (onFinishDrawingRef) {
-        onFinishDrawingRef.current = () => {
-          restrictedController.finishDrawing();
-        };
+        if (onFinishDrawingRef) {
+          onFinishDrawingRef.current = () => {
+            restrictedController.finishDrawing();
+          };
+        }
+      } catch (err) {
+        console.error('Error initializing restricted areas layer:', err);
       }
 
       // Apply initial layer toggles
-      boundaryController.setEezVisible(layers.eez);
-      boundaryController.setTerritorialSeaVisible(layers.territorialSea);
-      boundaryController.setContiguousZoneVisible(layers.contiguousZone);
-      cameraController.setVisibility(layers.cameras);
-      vesselController.setVisibility(layers.vessels);
+      if (boundaryControllerRef.current) {
+        boundaryControllerRef.current.setEezVisible(layers.eez);
+        boundaryControllerRef.current.setTerritorialSeaVisible(layers.territorialSea);
+        boundaryControllerRef.current.setContiguousZoneVisible(layers.contiguousZone);
+      }
+      if (cameraControllerRef.current) {
+        cameraControllerRef.current.setVisibility(layers.cameras);
+      }
+      if (vesselControllerRef.current) {
+        vesselControllerRef.current.setVisibility(layers.vessels);
+      }
     });
 
     return () => {

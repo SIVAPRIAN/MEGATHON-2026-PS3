@@ -13,32 +13,49 @@ import { maritimeZoneEngine } from '../utils/maritimeZones';
  * Pure minimal geometry: Pointed bow (▲), angled flare (/ \), straight sides (| |), flat stern (|_|).
  * Perfectly symmetric and centered at (8, 8) for wobble-free map rotation.
  */
-export function createShipSvgImage(fillColor: string, strokeColor: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const svgString = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path
-          d="M8 1.5 L12.5 6 L12.5 14.5 L3.5 14.5 L3.5 6 Z"
-          fill="${fillColor}"
-          stroke="${strokeColor}"
-          stroke-width="0.6"
-          stroke-linejoin="round"
-        />
-      </svg>
-    `;
+export function createShipImageData(fillColor: string, strokeColor: string): ImageData {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(2, 2);
+  ctx.beginPath();
+  ctx.moveTo(8, 1.5);
+  ctx.lineTo(12.5, 6);
+  ctx.lineTo(12.5, 14.5);
+  ctx.lineTo(3.5, 14.5);
+  ctx.lineTo(3.5, 6);
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 0.8;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  return ctx.getImageData(0, 0, 32, 32);
+}
 
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+export function createShipSvgImage(fillColor: string, strokeColor: string): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d')!;
+    ctx.beginPath();
+    ctx.moveTo(8, 1.5);
+    ctx.lineTo(12.5, 6);
+    ctx.lineTo(12.5, 14.5);
+    ctx.lineTo(3.5, 14.5);
+    ctx.lineTo(3.5, 6);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
     const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = (err) => {
-      URL.revokeObjectURL(url);
-      reject(err);
-    };
-    img.src = url;
+    img.src = canvas.toDataURL();
+    img.onload = () => resolve(img);
   });
 }
 
@@ -76,28 +93,24 @@ export class VesselLayerController {
   public async init(): Promise<void> {
     if (this.isInitialized || !this.map) return;
 
-    // 1. Register vector ship icons
+    // 1. Register vector ship icons synchronously via ImageData
     try {
-      const correlatedImg = await createShipSvgImage('#0f172a', '#020617'); // Dark Navy / Black
-      const darkImg = await createShipSvgImage('#dc2626', '#991b1b');       // Red (Dark vessel detection)
-      const restrictedImg = await createShipSvgImage('#f97316', '#c2410c'); // Orange (Restricted Area Violation)
-
       if (this.map.hasImage('vessel-correlated')) {
         this.map.removeImage('vessel-correlated');
       }
-      this.map.addImage('vessel-correlated', correlatedImg);
+      this.map.addImage('vessel-correlated', createShipImageData('#0f172a', '#020617'), { pixelRatio: 2 });
 
       if (this.map.hasImage('vessel-dark')) {
         this.map.removeImage('vessel-dark');
       }
-      this.map.addImage('vessel-dark', darkImg);
+      this.map.addImage('vessel-dark', createShipImageData('#dc2626', '#991b1b'), { pixelRatio: 2 });
 
       if (this.map.hasImage('vessel-restricted')) {
         this.map.removeImage('vessel-restricted');
       }
-      this.map.addImage('vessel-restricted', restrictedImg);
+      this.map.addImage('vessel-restricted', createShipImageData('#f97316', '#c2410c'), { pixelRatio: 2 });
     } catch (e) {
-      console.error('Failed to register vessel SVG images', e);
+      console.error('Failed to register vessel images', e);
     }
 
     // 2. Add GeoJSON Vessel Source (Direct individual rendering, no clustering)
@@ -240,6 +253,7 @@ export class VesselLayerController {
           'icon-anchor': 'center',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
+          'icon-optional': true,
           'icon-size': [
             'interpolate',
             ['linear'],
