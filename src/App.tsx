@@ -963,7 +963,7 @@ export const App: React.FC = () => {
         );
         flyToLocation(13.095, 80.365, 11);
         setSelectedVesselId('VSL-011');
-        setIsZoneManagerOpen(true);
+        setActiveSidebarPanel('areas');
 
         setActiveScenarioBanner({
           scenarioNum: 6,
