@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
+
+maplibregl.config.WORKER_URL = '/maplibre-gl-worker.mjs';
 import { Vessel } from '../data/vessels';
 import { MOCK_CAMERAS } from '../data/mockCameras';
 import { EOCamera, RestrictedArea } from '../types/maritime';
